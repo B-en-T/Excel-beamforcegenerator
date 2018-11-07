@@ -9,7 +9,7 @@ Generate Graphs of forces in Excel and calculate tension in fixed and rolling su
 
 
 
-Word in advance
+# Word in advance
 
  This class to generate force and tension graphs was made for a school assignment
  The code in question has been written quite fast and is in no way optimized
@@ -25,7 +25,7 @@ Word in advance
  Best wishes, Tony
 
 
- ###Usage###
+ # Setup / Usage
 
  create a class module in exel and copy atleast all of the non quoted code to it
  name / rename this class to modelerenclass
@@ -69,29 +69,31 @@ End Function
 createmodel "Uniquesheetname", "type of calculation", "Sheetname to add the tables",  "A3", "A6", "A9", "A13", "I7", "I3"
 ```
 
+ example 
 
- example --> createmodel "mClasstest", "fixed", "Sheetname", "A3", "A6", "A9", "A13", "I7", "I3"
+```
+ createmodel "mClasstest", "fixed", "Sheetname", "A3", "A6", "A9", "A13", "I7", "I3"
+```
 
-
- calling this line should generate empty tables on the sheetname
- calling this line again should update the graphs and tables by checking for filled in values inside the tables
-
-
- options explanation
-
- type of calculation options: "fixed" (fixed point on the left) or "punt" (hinge + rolling point calculation)
- A third option was under development called "AxBx" (two fixed points and usage of degrees for FA,FB) this one doesnt work properly,
- (i don't /didnt needed it anyway)'
- the positions of generated table positions are changeable by changing the cornercell names -> "A3", "A6", "A9", "A13", "I7", "I3"
+calling this line should generate empty tables on the sheetname
+calling this line again should update the graphs and tables by checking for filled in values inside the tables
 
 
+options explanation
 
-###onchange Auto run code example###
+type of calculation options: "fixed" (fixed point on the left) or "punt" (hinge + rolling point calculation)
+A third option was under development called "AxBx" (two fixed points and usage of degrees for FA,FB) this one doesnt work properly,
+(i don't /didnt needed it anyway)'
+the positions of generated table positions are changeable by changing the cornercell names -> "A3", "A6", "A9", "A13", "I7", "I3"
+
+
+
+# on table change Auto run code example
 
 usage and Steps
 
- add this code or a similar code to your excel vb excel project under modules -> modulename (probably Module1)
- to add more sheets just reuse / copy paste the code inside the sub
+add this code or a similar code to your excel vb excel project under modules -> modulename (probably Module1)
+to add more sheets just reuse / copy paste the code inside the sub
 
 
 ```
@@ -108,7 +110,7 @@ End Sub
 ```
 
 
- add this code or a similar code to your excel vb excel project under  microsoft excel objects --> ThisWorkbook
+add this code or a similar code to your excel vb excel project under  microsoft excel objects --> ThisWorkbook
 
 
 ```
