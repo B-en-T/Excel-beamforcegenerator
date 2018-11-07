@@ -1,0 +1,1542 @@
+
+'############################
+' CLASS MODULE CODE
+' Class name: modelerenclass
+' Generate Graphs of forces and calculate tension in fixed and rolling support beam situations
+'#############################
+
+'The MIT License (MIT)
+
+'Copyright (c) HVA 2018, Tony
+
+'Permission is hereby granted, free of charge, to any person obtaining a copy of
+'this software and associated documentation files (the "modelerenclass" code), to deal in
+'the Software without restriction, including without limitation the rights to
+'use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+'the Software, and to permit persons to whom the Software is furnished to do so,
+'subject to the following conditions:
+
+'The above copyright notice and this permission notice shall be included in all
+'copies or substantial portions of the Software.
+
+'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+'IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+'FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+'COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+'IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+'CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+'#####################################################################################
+
+'### Just so you know###'
+
+' This class to generate force and tension graphs was made for a school assignment
+' The code in question has been written quite fast and is in no way optimized
+' I took shortcuts and also i am to unexpirienced to write quality VB code.
+
+' be aware for the existence of bugs and possible slowdowns/ delays / crashes by non optimized code
+' I mostly tested the fixed situation option and it worked for me, hope you can use this or put it to good use
+
+' a well if you hate it... at least it was free
+
+' thanks to all tutorials and help topics about VB/Excel that i needed to make this
+
+' Best wishes, Tony
+
+'#####################################################################################3
+'
+' ###Usage###
+
+' create a class module in exel and copy atleast all of the non quoted code to it
+' name / rename this class to modelerenclass
+  
+ 
+'add this quoted code or a similar code to your excel vb excel project under modules -> modulename (probably Module1)
+
+'-----------------------------------------------------
+
+'Function createmodel(classname As String, berekentype As String, sheetname As String, forcepos As String, momentpos As String, supportpos As String, overigpos As String, calcpos As String, efpos As String)
+
+'   Dim mClass As New modelerenclass
+'   Dim lastactivecell As String
+'   Dim curSheetname As String
+'
+'   'sla huidige sheet en cel op
+'   lastactivecell = ActiveCell.Address
+'   curSheetname = ActiveSheet.name
+'   Application.EnableEvents = False
+'
+'
+'    mClass.rundefault classname, berekentype, sheetname, forcepos, momentpos, supportpos, overigpos, calcpos, efpos
+'
+'
+'
+'    'herselecteer de sheet en cel
+'    Application.EnableEvents = True
+'   Range(lastactivecell).Select
+'    Worksheets(curSheetname).Activate
+'
+'
+'End Function
+
+'-----------------------------------------------------
+
+
+' you can create all tables on a new sheet with the following line of code
+
+
+'createmodel "Uniquesheetname", "type of calculation", "Sheetname to add the tables",  "A3", "A6", "A9", "A13", "I7", "I3"
+
+
+
+' example --> createmodel "mClasstest", "fixed", "Sheetname", "A3", "A6", "A9", "A13", "I7", "I3"
+
+
+' calling this line should generate empty tables on the sheetname
+' calling this line again should update the graphs and tables by checking for filled in values inside the tables
+
+
+' options explanation
+
+' type of calculation options: "fixed" (fixed point on the left) or "punt" (hinge + rolling point calculation)
+' A third option was under development called "AxBx" (two fixed points and usage of degrees for FA,FB) this one doesnt work properly,i don't need it anyway'
+' the positions of generated table positions are changeable by changing the cornercell names -> "A3", "A6", "A9", "A13", "I7", "I3"
+'
+'#######################################################
+
+
+'###onchange Auto run code example###
+'
+'usage and Steps
+
+ 'add this quoted code or a similar code to your excel vb excel project under modules -> modulename (probably Module1)
+' to add more sheets just reuse / copy paste the code inside the sub
+
+'-----------------------------------
+
+'Sub runmodels(sheetedit As String)
+  
+'   If sheetedit = "Sheetname" Or sheetedit = "all" Then
+    
+'    createmodel "mClass", "fixed", "Sheetname", "A3", "A6", "A9", "A13", "I7", "I3"
+'
+'   End If
+  
+'End Sub
+
+'----------------------------------
+
+ 'add this quoted code or a similar code to your excel vb excel project under  microsoft excel objects --> ThisWorkbook
+
+'-----------------------------------
+
+'Private Sub Workbook_SheetChange(ByVal Sh As Object, ByVal Target As Range)
+    
+    'Automatically updates any table that has "UpdatedBy" and "UpdatedOn" columns
+    
+'    Dim c                               As Range
+'    Dim lo                              As ListObject
+
+'    Application.EnableEvents = False
+    
+'    For Each c In Target.Cells
+        'Debug.Print Now & "  " & Sh.Name, c.Address, """" & c.Value & """"
+'        For Each lo In Sh.ListObjects
+'        On Error GoTo Exit_Workbook_SheetChange
+'            If Not Intersect(c, lo.DataBodyRange) Is Nothing Then
+                
+                
+'                   Call runmodels(Sh.name)
+                   
+                   
+'                On Error GoTo 0
+'                Exit For 'lo
+'            End If
+'        Next lo
+'    Next c
+    
+'Exit_Workbook_SheetChange:
+'    Set lo = Nothing
+'    Set c = Nothing
+                
+'    Application.EnableEvents = True
+    
+'End Sub
+
+'-----------------------------------
+
+'create sub to call an update to all existing graphs manually
+
+'----------------------------------
+
+'Sub modeleren()
+'
+'  runmodels ("all")
+'
+'End Sub
+
+'-----------------------------------
+
+
+'Good Luck!
+
+'
+
+'init alle class variabelen
+
+
+Dim la As Double
+Dim lb As Double
+Dim ax As Double
+Dim ay As Double
+Dim bx As Double
+Dim by As Double
+Dim Hx As Double
+Dim Hy As Double
+Dim eMa As Double
+
+Public ltot As Double
+
+Dim oppervlakte As Double
+Dim afstandrand As Double
+Dim traagheidsmoment As Double
+
+Public spanningsvals As Boolean
+Public invoersheet As String
+Public name As String
+Public berekentype As String
+Public sheetname  As String
+
+Private graphpos  As String
+Private force() As Variant
+Private moment() As Variant
+Private supports() As Variant
+
+
+
+' init de modeleerclass
+Private Sub Class_Initialize()
+
+    ReDim supports(0 To 0, 0 To 2)
+    ReDim force(0 To 0, 0 To 5)
+    ReDim moment(0 To 0, 0 To 1)
+    
+End Sub
+
+
+'###
+'Creeer momentgrafiek functie
+'###
+
+Public Sub createmomentgraph()
+    
+    'defineer variabelen voor sub
+    Dim x() As Double
+    ReDim x(0 To (ltot * 100), 0 To 0)
+    Dim y() As Double
+    ReDim y(0 To (ltot * 100), 0 To 0)
+    Dim meterpoint As Double
+    Dim yval As Double
+    Dim sign As Integer
+    
+    
+    x(0, 0) = 0
+    y(0, 0) = 0
+    
+    'maak grafiek positief of negatief
+    sign = -1
+    
+    'doe voor de totale balk loop'
+    For i = 0 To ltot * 100
+        
+        'bepaal de meterwaarde
+        meterpoint = i / 100
+        'schrijf voor het x waardepunt in de grafiek de afstands/meterwaarde
+        x(i, 0) = meterpoint
+        
+        yval = 0
+        
+        If (berekentype = "fixed") Then
+            yval = eMa
+        End If
+        
+        'als huidig punt verder is dan lengte a
+        If meterpoint >= la Then
+            
+           yval = yval - (meterpoint - la) * ay
+         
+        End If
+         
+        ' loop alle tabelkrachten
+        For c = 0 To UBound(force)
+               
+            'als verder dan tabelkracht in m
+            If (meterpoint >= force(c, 3)) Then
+    
+                yval = yval + (meterpoint - force(c, 3)) * force(c, 5)
+                
+            End If
+                        
+                        
+        Next c
+        
+        'loop alle tabelmomenten
+        For c = 0 To UBound(moment)
+            'als verder dan momentkracht in m
+            If (meterpoint >= moment(c, 1)) Then
+                    
+                 yval = yval - moment(c, 0)
+                
+            End If
+                                           
+        Next c
+         
+        'als huidig punt verder is dan lengte b
+        If meterpoint >= lb Then
+            
+             yval = yval - (meterpoint - lb) * by
+         
+        End If
+        
+        'schrijf voor het y waardepunt in de grafiek de gecalculeerde y waarde
+        y(i, 0) = sign * yval
+    
+    
+    Next i
+    
+    'creer tabel'
+    createchart x, y, "momentgraph", "M-lijn"
+    
+End Sub
+
+
+'###
+'Creeer dwarskracht tabel functie
+'###
+Public Sub createdwarsgraph()
+    'defineer variabelen voor sub
+    Dim x() As Double
+    ReDim x(0 To (ltot * 100), 0 To 0)
+    Dim y() As Double
+    ReDim y(0 To ltot * 100, 0 To 0)
+    Dim meterpoint As Double
+    
+    Dim sign As Integer
+    Dim yval As Double
+    
+    x(0, 0) = 0
+    y(0, 0) = 0
+    
+    'maak tabel positief of negatief
+    sign = 1
+    
+    For i = 1 To ltot * 100
+           
+        yval = 0
+        
+        'bepaal de meterwaarde
+        meterpoint = i / 100
+        'schrijf voor het x waardepunt in de grafiek de afstands/meterwaarde
+        x(i, 0) = meterpoint
+    
+        
+        'als huidig punt verder is dan lengte a
+        If meterpoint >= la Then
+        
+            yval = ay
+       
+        End If
+         
+         ' loop alle tabelkrachten
+        For c = 0 To UBound(force)
+               
+            If (meterpoint >= force(c, 3)) Then
+                    
+                yval = yval - force(c, 5)
+                
+               End If
+                        
+                        
+        Next c
+        
+        'als huidig punt verder is dan lengte b
+        If meterpoint >= lb Then
+             
+             yval = yval + by
+        
+        End If
+        'schrijf voor het y waardepunt in de grafiek de gecalculeerde y waarde
+        y(i, 0) = sign * yval
+    Next i
+    
+    'stuur waardes naar de grafiekmaak functie
+    createchart x, y, "dwarsgraph", "D-lijn"
+    
+End Sub
+
+
+
+'###
+'Creeer normaalkracht tabel functie
+'###
+Public Sub createnormaalgraph()
+
+    'defineer variabelen voor sub
+    Dim x() As Double
+    ReDim x(0 To (ltot * 100), 0 To 0)
+    Dim y() As Double
+    ReDim y(0 To ltot * 100, 0 To 0)
+    Dim meterpoint As Double
+    Dim yval As Double
+    Dim sign As Integer
+    
+    
+    x(0, 0) = 0
+    y(0, 0) = 0
+    
+    'maak tabel positief of negatief
+    sign = 1
+    
+    For i = 1 To ltot * 100
+        
+        
+        yval = 0
+        
+        
+        'bepaal de meterwaarde
+        meterpoint = i / 100
+        'schrijf voor het x waardepunt in de grafiek de afstands/meterwaarde
+        x(i, 0) = meterpoint
+    
+        
+        'als huidig punt verder is dan lengte a
+        If meterpoint >= la Then
+        
+            yval = yval + ax
+       
+        End If
+         ' loop alle tabelkrachten
+        For c = 0 To UBound(force)
+               
+            If (meterpoint >= force(c, 3)) Then
+                    
+                yval = yval - force(c, 4)
+                
+            End If
+                        
+                        
+        Next c
+         
+        If berekentype = "AxBx" Then
+         
+            If meterpoint >= lb Then
+        
+                yval = yval - bx
+       
+            End If
+         
+        End If
+        'schrijf voor het y waardepunt in de grafiek de gecalculeerde y waarde
+        y(i, 0) = sign * yval
+    Next i
+    
+    
+    'stuur waardes naar de grafiekmaak functie
+    createchart x, y, "normaalgraph", "N-lijn"
+    
+        
+End Sub
+
+
+
+
+
+
+' maak buigspanningsgrafiek
+Public Sub buigspanningsgraph()
+
+'defineer variabelen voor sub
+Dim x() As Double
+ReDim x(0 To (ltot * 100), 0 To 0)
+Dim y() As Double
+ReDim y(0 To ltot * 100, 0 To 0)
+Dim meterpoint As Double
+Dim yval As Double
+Dim sign As Integer
+Dim totaalkracht As Double
+Dim buigkracht As Variant
+momentkracht = chartdata("momentgraph")
+
+x(0, 0) = 0
+y(0, 0) = 0
+
+'maak tabel positief of negatief
+sign = 1
+
+For i = 1 To ltot * 100
+    
+    yval = 0
+    
+    'bepaal de meterwaarde
+    meterpoint = i / 100
+    'schrijf voor het x waardepunt in de grafiek de afstands/meterwaarde
+    x(i, 0) = meterpoint
+
+    'bereken  buigkracht
+    
+    totaalkracht = momentkracht(i)
+    
+    yval = (totaalkracht * 10 ^ 6 * afstandrand) / traagheidsmoment
+    
+    'schrijf voor het y waardepunt in de grafiek de gecalculeerde y waarde
+    y(i, 0) = sign * yval
+
+Next i
+
+'stuur waardes naar de grafiekmaak functie
+createchart x, y, "buigspanninggraph", "Buigpanning"
+    
+End Sub
+
+' maak trekendrukgrafiek
+Public Sub trekendrukgraph()
+
+'defineer variabelen voor sub
+Dim x() As Double
+ReDim x(0 To (ltot * 100), 0 To 0)
+Dim y() As Double
+ReDim y(0 To ltot * 100, 0 To 0)
+Dim meterpoint As Double
+Dim yval As Double
+Dim sign As Integer
+Dim totaalkracht As Double
+Dim buigkracht As Variant
+trekendrukkracht = chartdata("normaalgraph")
+
+x(0, 0) = 0
+y(0, 0) = 0
+
+'maak tabel positief of negatief
+sign = 1
+
+For i = 1 To ltot * 100
+    
+    yval = 0
+    
+    'bepaal de meterwaarde
+    meterpoint = i / 100
+    'schrijf voor het x waardepunt in de grafiek de afstands/meterwaarde
+    x(i, 0) = meterpoint
+
+    'bereken  buigkracht
+    
+   
+    yval = (trekendrukkracht(i) * 10 ^ 3) / oppervlakte
+    
+    'schrijf voor het y waardepunt in de grafiek de gecalculeerde y waarde
+    y(i, 0) = sign * yval
+
+Next i
+
+'stuur waardes naar de grafiekmaak functie
+createchart x, y, "trekendrukgraph", "Trek en Drukspanning "
+    
+End Sub
+
+' maak normaalspanningsgrafiek
+Public Sub normaalspanninggraph()
+
+'defineer variabelen voor sub
+Dim x() As Double
+ReDim x(0 To (ltot * 100), 0 To 0)
+Dim y() As Double
+ReDim y(0 To ltot * 100, 0 To 0)
+Dim meterpoint As Double
+Dim yval As Double
+Dim sign As Integer
+
+
+Dim buigspanning  As Variant
+buigspanning = chartdata("buigspanninggraph")
+
+Dim trekendrukspanning As Variant
+trekendrukspanning = chartdata("trekendrukgraph")
+
+x(0, 0) = 0
+y(0, 0) = 0
+
+'maak tabel positief of negatief
+sign = 1
+
+For i = 2 To ltot * 100
+        
+    yval = 0
+    'bepaal de meterwaarde
+    meterpoint = i / 100
+    'schrijf voor het x waardepunt in de grafiek de afstands/meterwaarde
+    x(i, 0) = meterpoint
+
+    
+    'voeg buigmoment toe
+    yval = trekendrukspanning(i) + buigspanning(i)
+    
+    'schrijf voor het y waardepunt in de grafiek de gecalculeerde y waarde
+    y(i, 0) = sign * yval
+
+Next i
+
+'stuur waardes naar de grafiekmaak functie
+createchart x, y, "normaalspanninggraph", "Normaalspanning"
+
+    
+End Sub
+
+' maak schuifspanningsgrafiek
+Public Sub schuifspanninggraph()
+
+'defineer variabelen voor sub
+Dim x() As Double
+ReDim x(0 To (ltot * 100), 0 To 0)
+Dim y() As Double
+ReDim y(0 To ltot * 100, 0 To 0)
+Dim meterpoint As Double
+Dim yval As Double
+Dim sign As Integer
+
+Dim dwarskracht As Variant
+dwarskracht = chartdata("dwarsgraph")
+
+x(0, 0) = 0
+y(0, 0) = 0
+
+'maak tabel positief of negatief
+sign = 1
+
+For i = 1 To ltot * 100
+    
+    yval = 0
+    
+    'bepaal de meterwaarde
+    meterpoint = i / 100
+    'schrijf voor het x waardepunt in de grafiek de afstands/meterwaarde
+    x(i, 0) = meterpoint
+
+    'bereken  normaalkracht
+    yval = (dwarskracht(i) * 10 ^ 3 / oppervlakte)
+    
+    'schrijf voor het y waardepunt in de grafiek de gecalculeerde y waarde
+    y(i, 0) = sign * yval
+
+Next i
+
+'stuur waardes naar de grafiekmaak functie
+createchart x, y, "schuifspanninggraph", "Schuifspanning / Dwarskracht"
+    
+End Sub
+
+' maak spanningsgrafiek
+Public Sub idealespanninggraph()
+
+'defineer variabelen voor sub
+Dim x() As Double
+ReDim x(0 To (ltot * 100), 0 To 0)
+Dim y() As Double
+ReDim y(0 To ltot * 100, 0 To 0)
+Dim meterpoint As Double
+Dim yval As Double
+Dim sign As Integer
+
+Dim normaalspanning As Variant
+normaalspanning = chartdata("normaalspanninggraph")
+
+Dim schuifspanning As Variant
+schuifspanning = chartdata("schuifspanninggraph")
+
+x(0, 0) = 0
+y(0, 0) = 0
+
+'maak tabel positief of negatief
+sign = 1
+
+For i = 1 To ltot * 100
+      
+    yval = 0
+     
+    'bepaal de meterwaarde
+    meterpoint = i / 100
+    'schrijf voor het x waardepunt in de grafiek de afstands/meterwaarde
+    x(i, 0) = meterpoint
+
+    'bereken  normaalkracht
+    yval = VBA.Sqr(normaalspanning(i) ^ 2 + 3 * schuifspanning(i) ^ 2)
+        
+    'schrijf voor het y waardepunt in de grafiek de gecalculeerde y waarde
+    y(i, 0) = sign * yval
+
+Next i
+
+'stuur waardes naar de grafiekmaak functie
+createchart x, y, "idealespanninggraph", "Oi lijn"
+
+    
+End Sub
+
+'creer force tabel
+Public Sub CreateforceTable(Forceloc As String)
+ 
+    Dim columnNumber As Long
+    Dim myTab As ListObject
+    Dim ForceTableName As String
+    Dim lastrow As Integer
+    Dim NewRow As ListRow
+    Dim addrow As Boolean
+    Dim check() As Variant
+    Worksheets(sheetname).Activate
+    'unieke tabelnaam in workbook
+    ForceTableName = name + "-" + "ForceTable"
+    
+    Range(Forceloc).Select
+    'als niet bestaat creeer tabel
+    If (DetermineActiveTable(ForceTableName) = False) Then
+    
+        'Create Table in Excel VBA
+        ActiveSheet.ListObjects.Add(xlSrcRange, Range(ActiveCell.Offset(0, 0), ActiveCell.Offset(0, 6)), xlYes).name = _
+        ForceTableName
+        
+        Set myTab = ActiveSheet.ListObjects(ForceTableName)
+        myTab.ListColumns(1).name = "Naam"
+        myTab.ListColumns(2).name = "Waarde"
+        myTab.ListColumns(3).name = "[kN]"
+        myTab.ListColumns(4).name = "Hoek"
+        myTab.ListColumns(5).name = "[°]"
+        myTab.ListColumns(6).name = "Positie"
+        myTab.ListColumns(7).name = "[m]"
+        
+  
+    End If
+      
+   
+    
+    
+    'check of de laatste tabelrij waardes en nummers bevat
+    addrow = True
+    Set myTab = ActiveSheet.ListObjects(ForceTableName)
+    lastrow = myTab.ListRows.Count
+    check = Array(2, 4, 6)
+    
+    For Each col In check
+     On Error GoTo ding
+     If IsEmpty(myTab.ListRows.Item(lastrow).Range(col).value) Or IsNumeric(myTab.ListRows.Item(lastrow).Range(col).value) = False Then
+    
+         addrow = False
+     
+     End If
+      
+    Next
+    
+ding:
+   
+     ' als de tabelrijwaardes heeft voeg nieuw rij toe
+     If addrow = True Then
+   
+        Set NewRow = myTab.ListRows.Add(AlwaysInsert:=True)
+        myTab.ListRows.Item(lastrow + 1).Range(1) = "F" + CStr(lastrow + 1)
+        myTab.ListRows.Item(lastrow + 1).Range(3) = "[kN]"
+        myTab.ListRows.Item(lastrow + 1).Range(5) = "[°]"
+        myTab.ListRows.Item(lastrow + 1).Range(7) = "[m]"
+                            
+    End If
+
+End Sub
+
+
+' creeer moment tabel
+Public Sub CreatemomentTable(momentloc As String)
+ 
+    Dim columnNumber As Long
+    Dim myTab As ListObject
+    Dim lastactivecell As String
+    Dim momenttablename As String
+    Dim lastrow As Integer
+    Dim addrow As Boolean
+    Dim check() As Variant
+    Dim NewRow As ListRow
+    
+    Worksheets(sheetname).Activate
+    
+    momenttablename = name + "-" + momenttablename
+    
+    Range(momentloc).Select
+    
+    'kijk of tabel bestaat en evt creeer
+    If (DetermineActiveTable(momenttablename) = False) Then
+
+        ActiveSheet.ListObjects.Add(xlSrcRange, Range(ActiveCell.Offset(0, 0), ActiveCell.Offset(0, 4)), xlYes).name = _
+        momenttablename
+        
+        Set myTab = ActiveSheet.ListObjects(momenttablename)
+        myTab.ListColumns(1).name = "Naam"
+        myTab.ListColumns(2).name = "Waarde"
+        myTab.ListColumns(3).name = "[kN]"
+        myTab.ListColumns(4).name = "Positie"
+        myTab.ListColumns(3).name = "[m]"
+  
+    End If
+     
+    'selecteer huidige momenttabel
+    Set myTab = ActiveSheet.ListObjects(momenttablename)
+    
+    lastrow = myTab.ListRows.Count
+    
+    
+    'check of laatste rij waardes bevat
+    addrow = True
+    check = Array(2, 4)
+    
+    For Each col In check
+    On Error GoTo ding
+    If IsEmpty(myTab.ListRows.Item(lastrow).Range(col).value) Or IsNumeric(myTab.ListRows.Item(lastrow).Range(col).value) = False Then
+   
+        addrow = False
+    End If
+    
+    Next
+    
+ding:
+   
+     'als laatste rij waardes bevat maak nieuwe rij
+     If addrow = True Then
+
+      
+        Set NewRow = myTab.ListRows.Add(AlwaysInsert:=True)
+        myTab.ListRows.Item(lastrow + 1).Range(1) = "M" + CStr(lastrow + 1)
+        myTab.ListRows.Item(lastrow + 1).Range(3) = "[kNm]"
+        myTab.ListRows.Item(lastrow + 1).Range(5) = "[m]"
+              
+    End If
+    
+    'momenttabelwaardes naar array loop
+    Dim NumElements As Long
+    
+    For Each MomentRow In myTab.ListRows
+            If Not (IsEmpty(MomentRow.Range(2).value) Or IsNumeric(MomentRow.Range(2).value) = False) And (IsEmpty(MomentRow.Range(4).value) Or IsNumeric(MomentRow.Range(4).value)) Then
+                   
+                NumElements = UBound(moment) - LBound(moment)
+                If Not (IsEmpty(moment(0, 0))) Then
+                NumElements = NumElements + 1
+                moment = ReDimPreserve(moment, NumElements, 1)
+                
+                End If
+                
+                moment(NumElements, 0) = MomentRow.Range(2).value
+                moment(NumElements, 1) = MomentRow.Range(4).value
+                         
+            End If
+     Next
+    
+End Sub
+
+
+' creeer de Fa Fb positie tabel
+Public Sub CreateSupportPosTable(Supportloc As String)
+    
+    Dim columnNumber As Long
+    Dim myTab As ListObject
+    Dim lastactivecell As String
+    Dim SupportPosTableName As String
+    
+    Worksheets(sheetname).Activate
+    
+    SupportPosTableName = name + "-" + "SupportPosTable"
+
+    Range(Supportloc).Select
+    
+    'kijk of tabel bestaat en maak tabel
+    If (DetermineActiveTable(SupportPosTableName) = False) Then
+    
+        ActiveSheet.ListObjects.Add(xlSrcRange, Range(ActiveCell.Offset(0, 0), ActiveCell.Offset(1, 4)), xlYes).name = _
+        SupportPosTableName
+        
+        Set myTab = ActiveSheet.ListObjects(SupportPosTableName)
+        myTab.ListColumns(1).name = "Naam"
+        myTab.ListColumns(2).name = "Positie"
+        myTab.ListColumns(3).name = "[m]"
+        myTab.ListColumns(4).name = "Hoek"
+        myTab.ListColumns(5).name = "[°]"
+        
+        myTab.ListRows.Item(1).Range(1) = "FA"
+        myTab.ListRows.Item(1).Range(3) = "[m]"
+        myTab.ListRows.Item(2).Range(1) = "FB"
+        myTab.ListRows.Item(2).Range(3) = "[m]"
+        myTab.ListRows.Item(2).Range(5) = "[°]"
+        myTab.ListRows.Item(1).Range(5) = "[°]"
+        myTab.ListRows.Item(2).Range(4) = 0
+        myTab.ListRows.Item(1).Range(4) = 0
+        myTab.ListRows.Item(2).Range(2) = 0
+        myTab.ListRows.Item(1).Range(2) = 0
+        
+       
+             
+    End If
+
+End Sub
+
+
+' creeer de overige tabel
+Public Sub CreateoverigTable(overigloc As String)
+ 
+    Dim columnNumber As Long
+    Dim myTab As ListObject
+    Dim OverigTableName As String
+    
+    Worksheets(sheetname).Activate
+    
+    OverigTableName = name + "-" + "OverigTable"
+ 
+    Range(overigloc).Select
+    
+    'kijk of tabel bestaat en maak tabel
+    If (DetermineActiveTable(OverigTableName) = False) Then
+    
+        ActiveSheet.ListObjects.Add(xlSrcRange, Range(ActiveCell.Offset(0, 0), ActiveCell.Offset(3, 2)), xlYes).name = _
+        OverigTableName
+        
+        Set myTab = ActiveSheet.ListObjects(OverigTableName)
+        myTab.ListColumns(1).name = "Naam"
+        myTab.ListColumns(2).name = "Waarde"
+        myTab.ListColumns(3).name = "Eenheid"
+        
+        myTab.ListRows.Item(1).Range(1) = "Ixx"
+        myTab.ListRows.Item(1).Range(3) = "[mm4]"
+        myTab.ListRows.Item(2).Range(1) = "A"
+        myTab.ListRows.Item(2).Range(3) = "[mm2]"
+        myTab.ListRows.Item(3).Range(1) = "Afstand Rand"
+        myTab.ListRows.Item(3).Range(3) = "[mm]"
+        myTab.ListRows.Item(4).Range(1) = "Lengte balk"
+        myTab.ListRows.Item(4).Range(3) = "[m]"
+             
+    End If
+    
+End Sub
+
+'maak fx en fy tabel  en calculeer fx en fy waardes
+Public Sub berekensupport(Supportcalcloc As String)
+ 
+    Dim check() As Variant
+    Dim calculate As Boolean
+    Dim checkcount As Integer
+    Dim rowcount As Integer
+    Dim lastrow As Integer
+    Dim columnNumber As Long
+    Dim myTab As ListObject
+    Dim forcetable As ListObject
+    Dim NewRow As ListRow
+    Dim lastactivecell As String
+    Dim ForceTableName As String
+    Dim SupportCalcTableName As String
+    
+    Worksheets(sheetname).Activate
+    
+    
+    'naam van huidige tabellen
+    ForceTableName = name + "-" + "ForceTable"
+    SupportCalcTableName = name + "-" + "SupportcalcTable"
+    
+    Set forcetable = ActiveSheet.ListObjects(ForceTableName)
+    
+    
+    check = Array(2, 4, 6)
+  
+    checkcount = 0
+    
+ 
+    rowcount = 0
+         
+    Range(Supportcalcloc).Select
+    
+    If (DetermineActiveTable(SupportCalcTableName) = False) Then
+    
+        'Create Table in Excel VBA
+        ActiveSheet.ListObjects.Add(xlSrcRange, Range(ActiveCell.Offset(0, 0), ActiveCell.Offset(0, 3)), xlYes).name = _
+        SupportCalcTableName
+        Set myTab = ActiveSheet.ListObjects(SupportCalcTableName)
+        Set NewRow = myTab.ListRows.Add(AlwaysInsert:=True)
+        
+        myTab.ListColumns(1).name = "KrachtX"
+        myTab.ListColumns(2).name = "WaardeX"
+        myTab.ListColumns(3).name = "KrachtY"
+        myTab.ListColumns(4).name = "WaardeY"
+        myTab.ListRows.Item(1).Range(1) = "F1x"
+        myTab.ListRows.Item(1).Range(3) = "F1y"
+      
+             
+    End If
+    
+    Set myTab = ActiveSheet.ListObjects(SupportCalcTableName)
+    
+    'loop alle krachten en calculeer fx en fy
+    lastrow = forcetable.ListRows.Count
+    
+    For Each Row In forcetable.ListRows
+    
+    rowcount = rowcount + 1
+    
+    'controleer van alle kolommen van een rij of alle waardes nummers zijn
+    calculate = True
+    
+    
+         For Each col In check
+        
+            If IsEmpty(Row.Range(col).value) Or IsNumeric(Row.Range(col).value) = False Then
+                 calculate = False
+            End If
+    
+         Next
+       
+    'indien alles nummer van een rij calculeer
+    If calculate = True Then
+     
+        'voeg tabelrij toe indien nodig
+        checkcount = checkcount + 1
+        If (checkcount > myTab.ListRows.Count) Then
+           
+            Set NewRow = myTab.ListRows.Add(AlwaysInsert:=True)
+        End If
+        
+        'vul laatste tabelrij
+        myTab.ListRows.Item(checkcount).Range(1) = Row.Range(1).value + x
+        myTab.ListRows.Item(checkcount).Range(3) = Row.Range(1).value + "y"
+        myTab.ListRows.Item(checkcount).Range(2) = Round(Row.Range(2).value * cosd(Row.Range(4).value), 3)
+        myTab.ListRows.Item(checkcount).Range(4) = Round(Row.Range(2).value * sind(Row.Range(4).value), 3)
+        
+        'maak de forcearray groter
+        Dim NumElements As Long
+        
+        NumElements = UBound(force) - LBound(force)
+        If Not (IsEmpty(force(0, 0))) Then
+                NumElements = NumElements + 1
+                force = ReDimPreserve(force, NumElements, 5)
+        End If
+        
+        'vul de forcearray aan met nieuwe waardes
+        force(NumElements, 0) = Row.Range(1).value
+        force(NumElements, 1) = Row.Range(2).value
+        force(NumElements, 2) = Row.Range(4).value
+        force(NumElements, 3) = Row.Range(6).value
+        force(NumElements, 4) = myTab.ListRows.Item(checkcount).Range(2)
+        force(NumElements, 5) = myTab.ListRows.Item(checkcount).Range(4)
+      
+    
+    Else ' indien geen nummers in alle tabellen
+  
+       'indien alleen rij 1 over leeg rij 1
+       If checkcount < 1 Then
+       
+        myTab.ListRows.Item(1).Range(1) = "F1x"
+        myTab.ListRows.Item(1).Range(3) = "F1y"
+        myTab.ListRows.Item(1).Range(2) = ""
+        myTab.ListRows.Item(1).Range(4) = ""
+       
+       End If
+       
+       'indien meerdere rijen verwijder de laatste rij
+       If (checkcount < myTab.ListRows.Count And checkcount <> 0) Then
+        
+        myTab.ListRows(myTab.ListRows.Count).Delete
+       
+       End If
+       
+    End If
+    
+    Next
+
+End Sub
+
+' maak en vul efx efy tabel
+Public Sub Ef(calcloc As String)
+ 
+    Dim columnNumber As Long
+    Dim myTab As ListObject
+    Dim eftablename As String
+    Dim SupportCalcTableName As String
+    Dim SupportPosTableName As String
+    Dim SupportcalcTable As ListObject
+    Dim SupportPosTable As ListObject
+    Dim checkcount As Integer
+    Dim lastrow As Integer
+    
+    Worksheets(sheetname).Activate
+    
+    eftablename = name + "-" + "EfTable"
+    SupportCalcTableName = name + "-" + "SupportcalcTable"
+    SupportPosTableName = name + "-" + "SupportposTable"
+    
+    Set SupportcalcTable = ActiveSheet.ListObjects(SupportCalcTableName)
+    Set SupportPosTable = ActiveSheet.ListObjects(SupportPosTableName)
+    
+    Range(calcloc).Select
+    'indien geen tabel aanwezig maak tabel
+    If (DetermineActiveTable(eftablename) = False) Then
+    
+        ActiveSheet.ListObjects.Add(xlSrcRange, Range(ActiveCell.Offset(0, 0), ActiveCell.Offset(1, 8)), xlYes).name = _
+        eftablename
+        Set myTab = ActiveSheet.ListObjects(eftablename)
+        
+        myTab.ListColumns(1).name = "Efx"
+        myTab.ListColumns(2).name = "Efy"
+        myTab.ListColumns(3).name = "EMa"
+        myTab.ListColumns(4).name = "Ax"
+        myTab.ListColumns(5).name = "Ay"
+        myTab.ListColumns(6).name = "By"
+        myTab.ListColumns(7).name = "Bx"
+        myTab.ListColumns(8).name = "Fa"
+        myTab.ListColumns(9).name = "Fb"
+        
+             
+    End If
+   Set myTab = ActiveSheet.ListObjects(eftablename)
+   
+   'als punt en roloplegger berekening pak lengte a en b van tabel en evt graden voor axbx berekening
+    If (berekentype = "punt" Or berekentype = "AxBx") Then
+    
+        If Not IsEmpty(SupportPosTable.ListRows.Item(1).Range(2)) Or IsNumeric(SupportPosTable.ListRows.Item(1).Range(2)) = False Then
+        
+            la = SupportPosTable.ListRows.Item(1).Range(2).value
+            
+        
+        End If
+        
+        
+        If Not IsEmpty(SupportPosTable.ListRows.Item(2).Range(2)) Or IsNumeric(SupportPosTable.ListRows.Item(2).Range(2)) = False Then
+        
+            lb = SupportPosTable.ListRows.Item(2).Range(2).value
+        
+        End If
+    
+        'alleen nodig voor axbx
+        If Not IsEmpty(SupportPosTable.ListRows.Item(1).Range(4)) Or IsNumeric(SupportPosTable.ListRows.Item(1).Range(4)) = False Then
+        
+            ha = SupportPosTable.ListRows.Item(1).Range(4).value
+        
+        End If
+        
+        If Not IsEmpty(SupportPosTable.ListRows.Item(2).Range(4)) Or IsNumeric(SupportPosTable.ListRows.Item(2).Range(4)) = False Then
+        
+            hb = SupportPosTable.ListRows.Item(2).Range(4).value
+        
+        End If
+    
+    End If
+    
+    
+    
+    'als fixed berekening zet la en b aan 0 en vul de FA FB tabel
+    If (berekentype = "fixed") Then
+        
+        la = 0
+        lb = 0
+        SupportPosTable.ListRows.Item(1).Range(2).value = "linkerzijde"
+        SupportPosTable.ListRows.Item(2).Range(2).value = "NA"
+    
+    End If
+    
+    Set myTab = ActiveSheet.ListObjects(eftablename)
+    myTab.ListRows.Item(1).Range(1) = 0
+        myTab.ListRows.Item(1).Range(2) = 0
+        myTab.ListRows.Item(1).Range(3) = 0
+        myTab.ListRows.Item(1).Range(4) = 0
+        myTab.ListRows.Item(1).Range(5) = 0
+        myTab.ListRows.Item(1).Range(6) = 0
+        myTab.ListRows.Item(1).Range(7) = 0
+        myTab.ListRows.Item(1).Range(8) = 0
+        myTab.ListRows.Item(1).Range(9) = 0
+    
+    'calculeer efx efy ema loop
+    
+    lastrow = SupportcalcTable.ListRows.Count
+    
+    
+    For Each Row In SupportcalcTable.ListRows   'voor ierdere fx fy
+        
+            'indien alle waarde nummer in de fx rij
+            If Not IsEmpty(Row.Range(2).value) Or IsNumeric(Row.Range(2).value) = False Then
+                  
+                 
+                              
+                If berekentype = "AxBx" Then
+                
+                 For i = 0 To UBound(force)
+                    
+                  If (force(i, 0) = Row.Range(1).value) Then
+                    If (la >= force(i, 3)) Then
+                    ax = ax + Row.Range(2).value
+                    End If
+                    
+                    If (la < force(i, 3) And lb > force(i, 3)) Then
+                     ax = ax + (Row.Range(2).value / 2)
+                     bx = bx + (Row.Range(2).value / 2)
+                    
+                    End If
+                    
+                    If (lb <= force(i, 3)) Then
+                    bx = bx + Row.Range(2).value
+                    
+                    End If
+                End If
+                
+                Next i
+                
+                Else
+                
+                 
+                 'efx = efx + fx
+                 myTab.ListRows.Item(1).Range(1) = myTab.ListRows.Item(1).Range(1) + Row.Range(2).value
+                 
+                
+                End If
+            
+            
+            End If
+             'indien alle waarde een nummer in fy rij
+            
+            If Not IsEmpty(Row.Range(4).value) Or IsNumeric(Row.Range(4).value) = False Then
+            
+                 'efy = efy + fy
+                 myTab.ListRows.Item(1).Range(2) = myTab.ListRows.Item(1).Range(2) + Row.Range(4).value
+                          
+                  'loop alle naam rijen van de force array
+                  For i = 0 To UBound(force)
+                    
+                    'indien rijen corresponderen
+                    If (force(i, 0) = Row.Range(1).value) Then
+                    
+                     'voeg EMa moment toe van huidige fy kracht
+                     myTab.ListRows.Item(1).Range(3) = myTab.ListRows.Item(1).Range(3) + Row.Range(4).value * (force(i, 3) - la)
+                    End If
+                  Next i
+                      
+            End If
+    Next
+   
+   
+   'loop alle momentkrachten uit momentarray
+    
+  
+    For i = 0 To UBound(moment)
+
+        'voeg dezee toe aan EMa
+        myTab.ListRows.Item(1).Range(3) = myTab.ListRows.Item(1).Range(3) + moment(i, 0)
+  
+    Next i
+
+    myTab.ListRows.Item(1).Range(3) = Round(myTab.ListRows.Item(1).Range(3), 3)
+    
+    
+    If Not berekentype = "AxBx" Then
+    
+    'indien afstand van lb - la niet 0
+    If (lb - la <> 0) Then
+        
+        'deel de EMa door de afstand tussen lb en la
+        myTab.ListRows.Item(1).Range(3) = Round(myTab.ListRows.Item(1).Range(3) / (lb - la), 3)
+        
+    End If
+    
+    'vul ax ay by voor punt of fixed berekening
+    
+    If (berekentype = "punt" Or berekentype = "AxBx") Then
+    
+        myTab.ListRows.Item(1).Range(5) = myTab.ListRows.Item(1).Range(2) - myTab.ListRows.Item(1).Range(3)
+        myTab.ListRows.Item(1).Range(6) = myTab.ListRows.Item(1).Range(3)
+        
+    
+    Else
+    
+    myTab.ListRows.Item(1).Range(5) = myTab.ListRows.Item(1).Range(2)
+    myTab.ListRows.Item(1).Range(6) = 0
+    
+    
+    End If
+    
+    
+    
+    myTab.ListRows.Item(1).Range(4) = myTab.ListRows.Item(1).Range(1)
+    eMa = myTab.ListRows.Item(1).Range(3).value
+    ay = myTab.ListRows.Item(1).Range(5)
+    ax = myTab.ListRows.Item(1).Range(4)
+    bx = myTab.ListRows.Item(1).Range(7)
+    by = myTab.ListRows.Item(1).Range(6)
+   
+    
+    
+   
+    Else
+    
+    If (lb - la <> 0) Then
+        'deel de EMa door de afstand tussen lb en la
+        myTab.ListRows.Item(1).Range(3) = Round(myTab.ListRows.Item(1).Range(3) / (lb - la), 3)
+        
+    End If
+    
+     myTab.ListRows.Item(1).Range(5) = myTab.ListRows.Item(1).Range(2) - myTab.ListRows.Item(1).Range(3)
+     myTab.ListRows.Item(1).Range(6) = myTab.ListRows.Item(1).Range(3)
+     
+    
+        
+        
+        eMa = myTab.ListRows.Item(1).Range(3).value
+        ay = myTab.ListRows.Item(1).Range(5)
+        
+        by = myTab.ListRows.Item(1).Range(6)
+        myTab.ListRows.Item(1).Range(4) = ax
+        
+        bx = bx * -1
+        myTab.ListRows.Item(1).Range(7) = bx
+        
+        'bereken fa
+        
+        If (ha - 90 = 0) Then
+        myTab.ListRows.Item(1).Range(8) = ay
+        Else
+        
+        myTab.ListRows.Item(1).Range(8) = ay / cosd(ha - 90) + ax / sind(ha - 90) * -1
+        End If
+        If (hb - 90 = 0) Then
+         myTab.ListRows.Item(1).Range(9) = by
+        'bereken fb
+        Else
+        myTab.ListRows.Item(1).Range(9) = by / cosd(hb - 90) + bx / sind(hb - 90) * -1
+        End If
+    End If
+End Sub
+
+'haal waardes op uit de tabellen nodig voor grafiekcalculaties
+Public Sub beforegraph()
+    
+    Dim OverigTableName As String
+    OverigTableName = name + "-" + "OverigTable"
+    
+    
+    'indien lengtewaarde ingevuld waarde (geeft mogelijkheid tot d n m calculaties)
+    Set overigTable = ActiveSheet.ListObjects(OverigTableName)
+    If Not IsEmpty(overigTable.ListRows.Item(4).Range(2)) Or IsNumeric(overigTable.ListRows.Item(4).Range(2)) = False Then
+      
+      ltot = overigTable.ListRows.Item(4).Range(2)
+      
+    Else
+        
+        If Not ay = 0 Then
+              '  MsgBox "vul lengte balk in voor grafiekcalculatie"
+        End If
+    
+    End If
+    
+    'indien overige waardes ingevuld (geeft mogelijkheid tot spanningscalculaties)
+    If Not IsEmpty(overigTable.ListRows.Item(3).Range(2)) Or IsNumeric(overigTable.ListRows.Item(3).Range(2)) = False And IsEmpty(overigTable.ListRows.Item(1).Range(2)) Or IsNumeric(overigTable.ListRows.Item(1).Range(2)) = False And IsEmpty(overigTable.ListRows.Item(2).Range(2)) Or IsNumeric(overigTable.ListRows.Item(2).Range(2)) = False Then
+
+      oppervlakte = overigTable.ListRows.Item(2).Range(2)
+      afstandrand = overigTable.ListRows.Item(3).Range(2)
+      traagheidsmoment = overigTable.ListRows.Item(1).Range(2)
+      spanningsvals = True
+    
+    End If
+    
+End Sub
+
+' cos in graden functie
+Function cosd(d)
+    deg = (d * 3.14159265358979) / 180
+    cosd = Cos(deg)
+End Function
+
+' sin in graden functie
+Function sind(d)
+    deg = (d * 3.14159265358979) / 180
+    sind = Sin(deg)
+End Function
+
+' maak array groter (dynamisch functie)
+Public Function ReDimPreserve(aArrayToPreserve, nNewFirstUBound, nNewLastUBound)
+    ReDimPreserve = False
+    'check if its in array first
+    If IsArray(aArrayToPreserve) Then
+        'create new array
+        ReDim aPreservedArray(nNewFirstUBound, nNewLastUBound)
+        'get old lBound/uBound
+        nOldFirstUBound = UBound(aArrayToPreserve, 1)
+        nOldLastUBound = UBound(aArrayToPreserve, 2)
+        'loop through first
+        For nFirst = LBound(aArrayToPreserve, 1) To nNewFirstUBound
+            For nLast = LBound(aArrayToPreserve, 2) To nNewLastUBound
+                'if its in range, then append to new array the same way
+                If nOldFirstUBound >= nFirst And nOldLastUBound >= nLast Then
+                    aPreservedArray(nFirst, nLast) = aArrayToPreserve(nFirst, nLast)
+                End If
+            Next
+        Next
+        'return the array redimmed
+        If IsArray(aPreservedArray) Then ReDimPreserve = aPreservedArray
+    End If
+End Function
+
+'controleer of tabelnaam bestaat functie
+Function DetermineActiveTable(futuretable As String)
+
+    Dim SelectedCell As Range
+    Dim TableName  As String
+    Dim ActiveTable As ListObject
+    
+    Set SelectedCell = ActiveCell
+    
+    On Error GoTo NoTableSelected
+    
+    Set ActiveTable = ActiveSheet.ListObjects(futuretable)
+    If (IsEmpty(ActiveTable) = False) Then
+        DetermineActiveTable = True
+        Exit Function
+    End If
+    
+NoTableSelected:
+      DetermineActiveTable = False
+
+End Function
+
+' creeer grafiek met aangeleverde data
+Private Sub createchart(x() As Double, y() As Double, graphname As String, graphlabel As String)
+    
+    'defineer sub variabelen
+    Dim thischart As Chart
+    Dim ch As Object
+    Dim Sh As Worksheet
+    Dim icount As Integer
+    Dim exist  As Boolean
+    exist = False
+    graphname = name + "-" + graphname
+    
+    Cells(1, 1).Select
+    
+    ' check of de grafiek al bestaat binnen de sheet, indien ja selecteer
+    Worksheets(sheetname).Activate
+    For Each ch In ActiveSheet.ChartObjects
+                 
+        If (graphname = ch.name) Then
+            Set thischart = ActiveSheet.ChartObjects(graphname).Chart
+            exist = True
+        End If
+             
+    Next ch
+    
+    'indien niet aanwezig maak nieuwe grafiek aan
+    If exist = False Then
+    
+    
+    Set thischart = ActiveSheet.Shapes.AddChart.Chart
+     thischart.ChartType = xlLine
+     thischart.Parent.name = graphname
+    
+    End If
+    
+    'vul de geselecteerde of nieuw aangemaakte grafiek
+    
+    With thischart.SeriesCollection
+        If .Count = 0 Then .NewSeries
+        If Val(Application.Version) >= 12 Then
+            .Item(1).Values = y
+            .Item(1).XValues = x
+        Else
+            .Item(1).Select
+            Names.Add "_", x
+            ExecuteExcel4Macro "series.x(!_)"
+            Names.Add "_", y
+            ExecuteExcel4Macro "series.y(,!_)"
+            Names("_").Delete
+            
+        End If
+        
+    End With
+    thischart.SeriesCollection(1).name = graphlabel
+
+End Sub
+
+' haal grafiekdata op van gespecificeerde grafiek
+Public Function chartdata(graphname As String) As Variant
+
+    'defineer sub variabelen
+    Dim thischart As Chart
+    Dim ch As Object
+    Dim Sh As Worksheet
+    Dim icount As Integer
+    Dim exist  As Boolean
+    exist = False
+    graphname = name + "-" + graphname
+    'sla huidige geselecteerde sheetnaam op
+    strSheetName = ActiveSheet.name
+    
+    ' check of de grafiek al bestaat binnen de sheet, indien ja selecteer
+    
+    Worksheets(sheetname).Activate
+        For Each ch In ActiveSheet.ChartObjects
+            
+            If (graphname = ch.name) Then
+                Set thischart = ActiveSheet.ChartObjects(graphname).Chart
+                exist = True
+            End If
+             
+    Next ch
+        
+    
+    Worksheets(strSheetName).Activate
+    
+    'als tabel bestaat haal data op
+    If exist = True Then
+    
+        thischart.SeriesCollection
+        Dim returnval() As Variant
+        returnval = thischart.SeriesCollection.Item(1).Values
+        chartdata = returnval
+    
+    End If
+
+
+End Function
+
+
+'update/creeer / bedien grafiek
+
+Public Function rundefault(classname As String, thisberekentype As String, thissheetname As String, forcepos As String, momentpos As String, supportpos As String, overigpos As String, calcpos As String, efpos As String)
+
+    name = classname
+    berekentype = thisberekentype
+    sheetname = thissheetname
+    CreateforceTable forcepos
+    CreatemomentTable momentpos
+    CreateSupportPosTable supportpos
+    CreateoverigTable overigpos
+    berekensupport calcpos
+    Ef efpos
+    beforegraph
+    
+    
+   If Not ltot = 0 Then
+    
+        createdwarsgraph
+        createmomentgraph
+        createnormaalgraph
+        
+        If (spanningsvals = True) Then
+            
+            buigspanningsgraph
+            trekendrukgraph
+            schuifspanninggraph
+            normaalspanninggraph
+            idealespanninggraph
+            
+        Else
+         ' MsgBox "vul Ixx, A en de afstand naar de rand in voor spanningscalculatie"
+        End If
+   
+    End If
+
+
+End Function
