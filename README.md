@@ -2,7 +2,7 @@
 
 
 # Excel-beamforcegenerator
-Generate Graphs of forces in Excel and calculate tension in fixed and rolling support beam situations
+Generate Graphs of forces in Excel and calculate Stress in fixed and rolling support beam situations
 
 
 ![alt text](https://i.imgur.com/MPletqB.jpg)
